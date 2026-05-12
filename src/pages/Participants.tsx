@@ -26,7 +26,7 @@ const getCroppedImg = async (
 
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
+
   ctx.drawImage(
     image,
     pixelCrop.x,
@@ -41,11 +41,11 @@ const getCroppedImg = async (
 
   return canvas.toDataURL('image/jpeg', 0.6)
 }
-import { 
-  Search, 
-  Filter, 
-  UserPlus, 
-  Smile, 
+import {
+  Search,
+  Filter,
+  UserPlus,
+  Smile,
   Leaf,
   Eye,
   QrCode,
@@ -68,32 +68,32 @@ export default function Participants() {
   const groups = useMemo(() => {
     const defaultOrder = ['Sen Non', 'Sen Hồng', 'Sen Xanh'];
     const extractedGroups = Array.from(new Set(students.map(s => s.group))).filter((g): g is string => !!g);
-    
+
     extractedGroups.sort((a, b) => {
       const indexA = defaultOrder.indexOf(a);
       const indexB = defaultOrder.indexOf(b);
-      
+
       if (indexA !== -1 && indexB !== -1) return indexA - indexB;
       if (indexA !== -1) return -1;
       if (indexB !== -1) return 1;
       return a.localeCompare(b);
     });
-    
+
     // Always include defaults if they are missing from extraction
     defaultOrder.forEach(g => {
       if (!extractedGroups.includes(g)) extractedGroups.push(g);
     });
-    
+
     return ['all', ...extractedGroups];
   }, [students]);
 
   const formGroups = useMemo(() => groups.filter(g => g !== 'all'), [groups]);
-  
+
   const [modalState, setModalState] = useState<'view' | 'qr' | 'edit' | 'add' | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [formData, setFormData] = useState({ name: '', dh: '', group: 'Sen Non', phone: '', dob: '', joinDate: '' });
   const [lastLog, setLastLog] = useState<any>(null);
-  
+
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -107,7 +107,7 @@ export default function Participants() {
     } else if (type === 'add') {
       setFormData({ name: '', dh: '', group: 'Sen Non', phone: '', dob: '', joinDate: '' });
     }
-    
+
     if (type === 'view' && student) {
       fetchLastLogForStudent(student.id).then(log => setLastLog(log));
     } else {
@@ -139,12 +139,14 @@ export default function Participants() {
     if (file && selectedStudent) {
       if (file.size > 20 * 1024 * 1024) {
         alert("Kích thước ảnh không được vượt quá 20MB");
+        e.target.value = '';
         return;
       }
-      
+
       const reader = new FileReader();
       reader.onload = (event) => {
         setImageToCrop(event.target?.result as string);
+        e.target.value = '';
       };
       reader.readAsDataURL(file);
     }
@@ -154,39 +156,39 @@ export default function Participants() {
     if (!imageToCrop || !croppedAreaPixels || !selectedStudent) return;
     try {
       const croppedImageBase64 = await getCroppedImg(imageToCrop, croppedAreaPixels);
-      updateStudent(selectedStudent.id, { avatar: croppedImageBase64 });
+      await updateStudent(selectedStudent.id, { avatar: croppedImageBase64 });
       setSelectedStudent({ ...selectedStudent, avatar: croppedImageBase64 });
       setImageToCrop(null);
     } catch (e) {
       console.error(e);
-      alert('Có lỗi xảy ra khi cắt ảnh');
+      alert('Có lỗi xảy ra khi lưu ảnh. Vui lòng thử lại.');
     }
   };
-  
+
   const today = new Date().toISOString().split('T')[0];
   const attendedIds = new Set(todaysLogs.map(log => log.studentId));
 
   const filteredStudents = students.filter(s => {
     const isAttended = attendedIds.has(s.id);
-    
+
     // Search term filter
-    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.dh.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.phone.includes(searchTerm) ||
       s.id.includes(searchTerm);
-      
+
     // Status filter
-    const matchesStatus = filterStatus === 'all' ? true : 
+    const matchesStatus = filterStatus === 'all' ? true :
       (filterStatus === 'attended' ? isAttended : !isAttended);
-      
+
     // Group filter
     const matchesGroup = filterGroup === 'all' ? true : s.group === filterGroup;
-    
+
     return matchesSearch && matchesStatus && matchesGroup;
   });
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="h-full flex flex-col"
@@ -200,7 +202,7 @@ export default function Participants() {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 flex-1">
           <div className="relative flex-1 group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors" size={18} />
-            <input 
+            <input
               type="text"
               placeholder="Tìm kiếm..."
               className="w-full bg-surface-container-low border-none rounded-2xl pl-12 pr-4 py-3 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none transition-all"
@@ -208,10 +210,10 @@ export default function Participants() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          
+
           <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0 hide-scrollbar scroll-smooth">
             <div className="relative group shrink-0">
-              <select 
+              <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
                 className="bg-surface-container-low pl-4 pr-10 py-3 border-none outline-none rounded-2xl text-[11px] font-bold uppercase tracking-wider text-on-surface-variant hover:bg-surface-container-high transition-colors appearance-none cursor-pointer whitespace-nowrap"
@@ -236,7 +238,7 @@ export default function Participants() {
             </div>
           </div>
         </div>
-        <button 
+        <button
           onClick={() => handleOpenModal('add')}
           className="bg-primary text-on-primary px-6 sm:px-8 py-3.5 rounded-2xl sm:rounded-full text-[11px] font-bold tracking-[0.1em] uppercase flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all"
         >
@@ -259,7 +261,7 @@ export default function Participants() {
           {filteredStudents.map((p, i) => {
             const isAttended = attendedIds.has(p.id);
             return (
-              <motion.div 
+              <motion.div
                 key={p.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -300,7 +302,7 @@ export default function Participants() {
                     {p.group}
                   </span>
                 </div>
-                
+
                 <div className="hidden sm:col-span-2 sm:block text-center">
                   <p className="text-sm font-bold text-on-surface whitespace-nowrap">{p.phone}</p>
                   <p className="text-[11px] text-outline font-medium whitespace-nowrap">{p.dob}</p>
@@ -336,8 +338,8 @@ export default function Participants() {
                       <Edit2 size={18} />
                     </button>
                   </div>
-                  
-                  <button 
+
+                  <button
                     className="p-2 sm:p-3 hover:bg-error/10 rounded-lg transition-colors text-outline hover:text-error"
                     onClick={() => {
                       if (settings.requireDeleteConfirm) {
@@ -353,8 +355,9 @@ export default function Participants() {
                   </button>
                 </div>
               </motion.div>
-            )})}
-          
+            )
+          })}
+
           {filteredStudents.length === 0 && (
             <div className="py-20 text-center flex flex-col items-center">
               <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center text-outline/30 mb-4 outline outline-4 outline-outline-variant/10">
@@ -374,7 +377,7 @@ export default function Participants() {
 
       <AnimatePresence>
         {modalState && (
-          <div 
+          <div
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
             onClick={handleCloseModal}
           >
@@ -385,7 +388,7 @@ export default function Participants() {
               onClick={(e) => e.stopPropagation()}
               className="bg-surface-container-lowest rounded-3xl p-6 md:p-8 shadow-2xl w-full max-w-md relative"
             >
-              <button 
+              <button
                 onClick={handleCloseModal}
                 className="absolute top-4 right-4 p-2 bg-surface-container hover:bg-surface-container-high rounded-full transition-colors text-on-surface-variant"
               >
@@ -401,8 +404,8 @@ export default function Participants() {
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                         <Camera className="text-white" size={24} />
                       </div>
-                      <input 
-                        type="file" 
+                      <input
+                        type="file"
                         accept="image/*"
                         className="absolute inset-0 opacity-0 cursor-pointer"
                         onChange={handleUploadAvatar}
@@ -442,10 +445,10 @@ export default function Participants() {
                       <span className="text-xs font-bold text-outline-variant uppercase tracking-wider">Lần điểm danh cuối</span>
                       <span className="text-sm font-bold text-tertiary">
                         {(() => {
-                           if (lastLog) {
-                             return `${new Date(lastLog.timestamp).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} ngày ${new Date(lastLog.timestamp).toLocaleDateString('vi-VN', {day: '2-digit', month: '2-digit'})}`;
-                           }
-                           return 'Chưa tham gia / Đang tải...';
+                          if (lastLog) {
+                            return `${new Date(lastLog.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ngày ${new Date(lastLog.timestamp).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}`;
+                          }
+                          return 'Chưa tham gia / Đang tải...';
                         })()}
                       </span>
                     </div>
@@ -472,59 +475,59 @@ export default function Participants() {
                   <form onSubmit={handleFormSubmit} className="space-y-4">
                     <div>
                       <label className="text-[10px] font-bold tracking-widest text-on-surface-variant uppercase mb-1 block">Họ và tên</label>
-                      <input 
-                        type="text" 
-                        required 
+                      <input
+                        type="text"
+                        required
                         value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         className="w-full bg-surface-container-low border border-outline-variant/50 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none"
                       />
                     </div>
                     <div>
                       <label className="text-[10px] font-bold tracking-widest text-on-surface-variant uppercase mb-1 block">Pháp danh</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={formData.dh}
-                        onChange={(e) => setFormData({...formData, dh: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, dh: e.target.value })}
                         className="w-full bg-surface-container-low border border-outline-variant/50 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-[10px] font-bold tracking-widest text-on-surface-variant uppercase mb-1 block">Số điện thoại</label>
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           value={formData.phone}
-                          onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                           className="w-full bg-surface-container-low border border-outline-variant/50 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none"
                         />
                       </div>
                       <div>
                         <label className="text-[10px] font-bold tracking-widest text-on-surface-variant uppercase mb-1 block">Ngày sinh</label>
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           placeholder="DD/MM/YYYY"
                           value={formData.dob}
-                          onChange={(e) => setFormData({...formData, dob: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
                           className="w-full bg-surface-container-low border border-outline-variant/50 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none"
                         />
                       </div>
                     </div>
                     <div>
                       <label className="text-[10px] font-bold tracking-widest text-on-surface-variant uppercase mb-1 block">Ngày tham gia khóa tu</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         placeholder="DD/MM/YYYY"
                         value={formData.joinDate}
-                        onChange={(e) => setFormData({...formData, joinDate: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, joinDate: e.target.value })}
                         className="w-full bg-surface-container-low border border-outline-variant/50 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none"
                       />
                     </div>
                     <div>
                       <label className="text-[10px] font-bold tracking-widest text-on-surface-variant uppercase mb-1 block">Nhóm</label>
-                      <select 
+                      <select
                         value={formData.group}
-                        onChange={(e) => setFormData({...formData, group: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, group: e.target.value })}
                         className="w-full bg-surface-container-low border border-outline-variant/50 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none appearance-none"
                       >
                         {formGroups.map(g => (
@@ -532,7 +535,7 @@ export default function Participants() {
                         ))}
                       </select>
                     </div>
-                    
+
                     <button type="submit" className="w-full bg-primary text-white py-3 rounded-full font-bold shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all mt-8">
                       {modalState === 'add' ? 'Lưu & Khởi tạo QR' : 'Cập nhật thông tin'}
                     </button>
@@ -543,8 +546,8 @@ export default function Participants() {
           </div>
         )}
         {imageToCrop && (
-          <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
-            <motion.div 
+          <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -556,7 +559,7 @@ export default function Participants() {
                   <X size={20} className="text-on-surface-variant" />
                 </button>
               </div>
-              
+
               <div className="relative w-full h-[300px] bg-black">
                 <Cropper
                   image={imageToCrop}
@@ -570,7 +573,7 @@ export default function Participants() {
                   onZoomChange={setZoom}
                 />
               </div>
-              
+
               <div className="p-6">
                 <div className="mb-6">
                   <label className="text-xs font-bold text-on-surface-variant mb-2 block">Thu phóng</label>
@@ -585,15 +588,15 @@ export default function Participants() {
                     className="w-full h-2 bg-surface-container-high rounded-lg appearance-none cursor-pointer"
                   />
                 </div>
-                
+
                 <div className="flex gap-4">
-                  <button 
+                  <button
                     onClick={() => setImageToCrop(null)}
                     className="flex-1 py-3 font-bold rounded-xl border-2 border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-low transition-colors"
                   >
                     Hủy
                   </button>
-                  <button 
+                  <button
                     onClick={handleCropConfirm}
                     className="flex-1 py-3 font-bold rounded-xl bg-primary text-white shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all"
                   >
