@@ -1,0 +1,101 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 0.1 Context-Aware Helper Constraints
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function isValidEmailId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-.@]+$');
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'tantaitanthoi@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.token.email))
+      );
+    }
+
+    // Models validation
+    function isValidStudent(data) {
+      return data.keys().hasAll(['name', 'group', 'qr_link', 'createdAt', 'updatedAt']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.group is string && data.group.size() <= 50 &&
+             data.qr_link is string && data.qr_link.size() <= 300 &&
+             data.createdAt is number &&
+             data.updatedAt is number &&
+             data.get('phone', '') is string &&
+             data.get('dh', '') is string &&
+             data.get('dob', '') is string &&
+             data.get('avatar', '') is string &&
+             data.get('sessions', 0) is number;
+    }
+
+    function isValidAttendanceLog(data) {
+      return data.keys().hasAll(['studentId', 'studentName', 'date', 'timestamp', 'type', 'createdAt']) &&
+             data.studentId is string && data.studentId.size() <= 128 &&
+             data.studentName is string && data.studentName.size() <= 100 &&
+             data.date is string && data.date.size() <= 50 &&
+             data.timestamp is number &&
+             data.type is string && (data.type == 'check-in' || data.type == 'check-out') &&
+             data.createdAt is number &&
+             data.get('dh', '') is string;
+    }
+
+    function isValidAnnouncement(data) {
+      return data.keys().hasAll(['content', 'isCompleted', 'createdAt']) &&
+             data.content is string && data.content.size() <= 1000 &&
+             data.isCompleted is bool &&
+             data.createdAt is number;
+    }
+    
+    function isValidAdmin(data) {
+      return data.keys().hasAll(['email', 'createdAt']) &&
+             data.email is string && data.email.size() <= 128 &&
+             data.createdAt is number;
+    }
+
+    // 1. Students Collection
+    match /students/{studentId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidId(studentId) && isValidStudent(incoming());
+      allow update: if isAdmin() && isValidId(studentId) && isValidStudent(incoming()) && incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin() && isValidId(studentId);
+    }
+
+    // 2. AttendanceLogs Collection
+    match /attendanceLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidId(logId) && isValidAttendanceLog(incoming());
+      allow update: if false; // Logs should be immutable
+      allow delete: if isAdmin() && isValidId(logId);
+    }
+
+    // 3. Announcements Collection
+    match /announcements/{annId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidId(annId) && isValidAnnouncement(incoming());
+      allow update: if isAdmin() && isValidId(annId) && isValidAnnouncement(incoming()) && incoming().createdAt == existing().createdAt;
+      allow delete: if isAdmin() && isValidId(annId);
+    }
+    
+    // 4. Admins Collection
+    match /admins/{adminId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidEmailId(adminId) && isValidAdmin(incoming()) && incoming().email == adminId;
+      allow update: if isAdmin() && isValidEmailId(adminId) && isValidAdmin(incoming()) && incoming().createdAt == existing().createdAt && incoming().email == existing().email;
+      allow delete: if isAdmin() && isValidEmailId(adminId);
+    }
+  }
+}

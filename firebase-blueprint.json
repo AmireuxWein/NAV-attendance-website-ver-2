@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Student details",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "dh": { "type": "string" },
+        "group": { "type": "string" },
+        "phone": { "type": "string" },
+        "dob": { "type": "string" },
+        "sessions": { "type": "number" },
+        "avatar": { "type": "string" },
+        "qr_link": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "group", "qr_link", "createdAt", "updatedAt"]
+    },
+    "AttendanceLog": {
+      "title": "AttendanceLog",
+      "description": "Log of student attendance",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "dh": { "type": "string" },
+        "date": { "type": "string" },
+        "timestamp": { "type": "number", "description": "Milliseconds since epoch or Firestore timestamp" },
+        "type": { "type": "string", "enum": ["check-in", "check-out"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["studentId", "studentName", "date", "timestamp", "type", "createdAt"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "System notes and tasks",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "isCompleted": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["content", "isCompleted", "createdAt"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Authorized administrators",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "students": {
+      "schema": "Student",
+      "description": "Collection of all students"
+    },
+    "attendanceLogs": {
+      "schema": "AttendanceLog",
+      "description": "Collection of all attendance logs"
+    },
+    "announcements": {
+      "schema": "Announcement",
+      "description": "Collection of all announcements"
+    },
+    "admins": {
+      "schema": "Admin",
+      "description": "Collection of authorized admin emails"
+    }
+  }
+}

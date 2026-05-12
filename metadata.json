@@ -1,0 +1,6 @@
+{
+  "name": "Niềm An Vui Management",
+  "description": "A modern zen-inspired management portal for retreats, featuring attendance tracking, participant management, and reporting.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}
