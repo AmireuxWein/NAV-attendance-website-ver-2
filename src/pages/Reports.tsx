@@ -1,16 +1,17 @@
-import { 
-  Calendar, 
-  ChevronDown, 
-  ChevronRight, 
-  FileSpreadsheet, 
-  FileText, 
-  Eye, 
+import {
+  Calendar,
+  ChevronDown,
+  ChevronRight,
+  FileSpreadsheet,
+  FileText,
+  Eye,
   Settings2,
   Info
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useData } from '../contexts/DataContext';
 import { useState, useMemo, useEffect } from 'react';
+import { sortStudentsGlobal } from '../lib/utils';
 
 export default function Reports() {
   const { students, fetchLogsByDateRange } = useData();
@@ -36,21 +37,21 @@ export default function Reports() {
   const groups = useMemo(() => {
     const defaultOrder = ['Sen Non', 'Sen Hồng', 'Sen Xanh'];
     const extractedGroups = Array.from(new Set(students.map(s => s.group))).filter((g): g is string => !!g);
-    
+
     extractedGroups.sort((a, b) => {
       const indexA = defaultOrder.indexOf(a);
       const indexB = defaultOrder.indexOf(b);
-      
+
       if (indexA !== -1 && indexB !== -1) return indexA - indexB;
       if (indexA !== -1) return -1;
       if (indexB !== -1) return 1;
       return a.localeCompare(b);
     });
-    
+
     defaultOrder.forEach(g => {
       if (!extractedGroups.includes(g)) extractedGroups.push(g);
     });
-    
+
     return ['Tất cả các nhóm', ...extractedGroups];
   }, [students]);
 
@@ -59,40 +60,30 @@ export default function Reports() {
     if (selectedGroup !== 'Tất cả các nhóm') {
       filtered = filtered.filter(s => s.group === selectedGroup);
     }
-    
-    const defaultOrder = ['Sen Non', 'Sen Hồng', 'Sen Xanh'];
-    filtered.sort((a, b) => {
-      const groupA = a.group || '';
-      const groupB = b.group || '';
-      const indexA = defaultOrder.indexOf(groupA);
-      const indexB = defaultOrder.indexOf(groupB);
-      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-      if (indexA !== -1) return -1;
-      if (indexB !== -1) return 1;
-      return groupA.localeCompare(groupB);
-    });
+
+    filtered = sortStudentsGlobal(filtered);
 
     return filtered.map(student => {
-      const studentLogs = reportLogs.filter(log => 
-        log.studentId === student.id && 
-        log.date >= fromDate && 
+      const studentLogs = reportLogs.filter(log =>
+        log.studentId === student.id &&
+        log.date >= fromDate &&
         log.date <= toDate
       );
-      
+
       const start = new Date(fromDate);
       const end = new Date(toDate);
       const daysDiff = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
       // Tránh chia cho số 0
-      const totalDays = Math.max(1, daysDiff + 1); 
-      
+      const totalDays = Math.max(1, daysDiff + 1);
+
       const present = studentLogs.length;
-      
+
       const timeAttended = studentLogs
         .slice()
         .sort((a, b) => a.timestamp - b.timestamp)
-        .map(log => `${new Date(log.timestamp).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} ${new Date(log.timestamp).toLocaleDateString('vi-VN', {day: '2-digit', month: '2-digit'})}`)
+        .map(log => `${new Date(log.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${new Date(log.timestamp).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}`)
         .join(', ');
-      
+
       return {
         name: student.name,
         group: student.group,
@@ -104,7 +95,7 @@ export default function Reports() {
   }, [students, reportLogs, fromDate, toDate, selectedGroup]);
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="space-y-12"
@@ -112,7 +103,7 @@ export default function Reports() {
       <div>
         <h2 className="text-3xl font-bold text-on-surface">Xuất Báo Cáo Chuyên Cần</h2>
         <p className="text-on-surface-variant mt-2 max-w-2xl font-medium">
-          Cấu hình các tham số bên dưới để trích xuất dữ liệu tham gia của khóa sinh. 
+          Cấu hình các tham số bên dưới để trích xuất dữ liệu tham gia của khóa sinh.
           Hệ thống hỗ trợ định dạng Excel và PDF.
         </p>
       </div>
@@ -124,14 +115,14 @@ export default function Reports() {
               <Settings2 size={24} className="text-tertiary" />
               Tham số báo cáo
             </h3>
-            
+
             <div className="space-y-6">
               <div className="space-y-4">
                 <div>
                   <label className="text-[10px] font-extrabold tracking-[0.2em] text-on-surface-variant uppercase mb-2 block">TỪ NGÀY</label>
                   <div className="relative group">
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       value={fromDate}
                       onChange={(e) => setFromDate(e.target.value)}
                       className="w-full bg-surface-container-low border-b-2 border-transparent focus:border-tertiary outline-none rounded-t-xl px-4 py-4 text-sm font-bold transition-all"
@@ -141,8 +132,8 @@ export default function Reports() {
                 <div>
                   <label className="text-[10px] font-extrabold tracking-[0.2em] text-on-surface-variant uppercase mb-2 block">ĐẾN NGÀY</label>
                   <div className="relative group">
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       value={toDate}
                       onChange={(e) => setToDate(e.target.value)}
                       className="w-full bg-surface-container-low border-b-2 border-transparent focus:border-tertiary outline-none rounded-t-xl px-4 py-4 text-sm font-bold transition-all"
@@ -154,7 +145,7 @@ export default function Reports() {
               <div>
                 <label className="text-[10px] font-extrabold tracking-[0.2em] text-on-surface-variant uppercase mb-2 block">NHÓM KHÓA SINH</label>
                 <div className="relative group">
-                  <select 
+                  <select
                     value={selectedGroup}
                     onChange={(e) => setSelectedGroup(e.target.value)}
                     className="w-full bg-surface-container-low border-b-2 border-transparent focus:border-tertiary outline-none rounded-t-xl px-5 py-4 text-sm font-bold appearance-none transition-all"
@@ -169,11 +160,11 @@ export default function Reports() {
             </div>
 
             <div className="pt-10 mt-6 border-t border-primary-container/10 space-y-3">
-              <button 
+              <button
                 onClick={() => {
                   import('xlsx').then(({ utils, writeFile }) => {
                     const headers = ['Họ và tên', 'Nhóm', 'Có mặt', 'Thời gian điểm danh'];
-                    
+
                     const data = filteredStudents.map(s => {
                       return [s.name, s.group, s.present, s.timeAttended];
                     });
@@ -189,7 +180,7 @@ export default function Reports() {
                 <FileSpreadsheet size={18} />
                 Xuất Excel (.xlsx)
               </button>
-              <button 
+              <button
                 onClick={() => window.print()}
                 className="w-full bg-transparent border-2 border-tertiary text-tertiary font-bold py-4 rounded-full flex items-center justify-center gap-3 hover:bg-tertiary/5 active:scale-95 transition-all outline-none"
               >
@@ -209,14 +200,14 @@ export default function Reports() {
               </div>
               <Eye size={32} className="text-primary-container/30" />
             </div>
-            
+
             {/* Header for print only */}
             <div className="hidden print:block mb-8 text-center">
               <h2 className="text-2xl font-bold mb-2">BÁO CÁO CHUYÊN CẦN</h2>
               <p className="text-sm">Từ ngày: {fromDate} - Đến ngày: {toDate}</p>
               <p className="text-sm">Nhóm: {selectedGroup}</p>
             </div>
-            
+
             <div className="overflow-x-auto max-h-[600px] print:max-h-none print:overflow-visible">
               <table className="w-full text-left">
                 <thead className="sticky top-0 bg-surface-container-low print:bg-transparent">

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { collection, onSnapshot, doc, setDoc, deleteDoc, query, getDocs, where, writeBatch, serverTimestamp, getDoc, arrayUnion } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, query, getDocs, where, writeBatch, serverTimestamp, getDoc, arrayUnion, runTransaction } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -247,55 +247,64 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         return { success: true, message: 'Đã điểm danh hôm nay', student, isDuplicate: true };
       }
 
-      // Double check in Firestore directly to prevent race conditions
-      // We only query by studentId to avoid needing a composite index
-      const q = query(
-        collection(db, 'attendanceLogs'),
-        where('studentId', '==', studentId)
-      );
-      const snap = await getDocs(q);
-      
-      const alreadyAttendedDB = snap.docs.some(doc => doc.data().date === todayDate);
-      if (alreadyAttendedDB) {
-        return { success: true, message: 'Đã điểm danh hôm nay', student, isDuplicate: true };
-      }
-
-      const logRef = doc(collection(db, 'attendanceLogs'));
-      const newLog: Omit<AttendanceLog, 'id'> = {
-        studentId,
-        studentName: student.name,
-        dh: student.dh || '',
-        date: todayDate,
-        timestamp: Date.now(),
-        type: 'check-in',
-        createdAt: Date.now()
-      };
-
-      const batch = writeBatch(db);
-      batch.set(logRef, newLog);
-      
+      // Use deterministic ID for attendance log to enforce uniqueness per day
+      const logId = `${studentId}_${todayDate}`;
+      const logRef = doc(db, 'attendanceLogs', logId);
       const studentRef = doc(db, 'students', studentId);
-      batch.update(studentRef, { 
-        sessions: student.sessions + 1,
-        updatedAt: Date.now()
+      const statsRef = doc(db, 'stats', 'attendance');
+
+      await runTransaction(db, async (transaction) => {
+        // Read operations must come first
+        const logDoc = await transaction.get(logRef);
+        if (logDoc.exists()) {
+          throw new Error('ALREADY_ATTENDED');
+        }
+
+        const studentDoc = await transaction.get(studentRef);
+        if (!studentDoc.exists()) {
+          throw new Error('STUDENT_NOT_FOUND');
+        }
+
+        // Write operations
+        const newLog: Omit<AttendanceLog, 'id'> = {
+          studentId,
+          studentName: studentDoc.data().name,
+          dh: studentDoc.data().dh || '',
+          date: todayDate,
+          timestamp: Date.now(),
+          type: 'check-in',
+          createdAt: Date.now()
+        };
+
+        transaction.set(logRef, newLog);
+        
+        transaction.update(studentRef, { 
+          sessions: (studentDoc.data().sessions || 0) + 1,
+          updatedAt: Date.now()
+        });
+
+        transaction.set(statsRef, {
+          sessionDates: arrayUnion(todayDate)
+        }, { merge: true });
       });
 
-      const statsRef = doc(db, 'stats', 'attendance');
-      batch.set(statsRef, {
-        sessionDates: arrayUnion(todayDate)
-      }, { merge: true });
-
-      await batch.commit();
-
+      // Update total sessions in local state if needed
       const newStatsSnap = await getDoc(statsRef);
       if (newStatsSnap.exists()) {
         setTotalSessions((newStatsSnap.data().sessionDates || []).length);
       }
 
       return { success: true, message: 'Điểm danh thành công', student };
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === 'ALREADY_ATTENDED') {
+        const student = students.find((s) => s.id === studentId);
+        return { success: true, message: 'Đã điểm danh hôm nay', student, isDuplicate: true };
+      }
+      if (error.message === 'STUDENT_NOT_FOUND') {
+        return { success: false, message: 'Không tìm thấy khóa sinh trong database' };
+      }
       handleFirestoreError(error, OperationType.CREATE, 'attendanceLogs');
-      return { success: false, message: 'Có lỗi xảy ra' };
+      return { success: false, message: 'Có lỗi xảy ra khi đồng bộ' };
     }
   };
 

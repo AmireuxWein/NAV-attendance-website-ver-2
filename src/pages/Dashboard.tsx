@@ -1,22 +1,22 @@
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
   Cell,
   PieChart,
   Pie
 } from 'recharts';
-import { 
-  ArrowUp, 
-  ArrowDown, 
-  Cake, 
-  Megaphone, 
-  CalendarDays, 
-  Shirt, 
+import {
+  ArrowUp,
+  ArrowDown,
+  Cake,
+  Megaphone,
+  CalendarDays,
+  Shirt,
   Send,
   Shield,
   Trash2,
@@ -28,7 +28,7 @@ import {
   Check
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useData } from '../contexts/DataContext';
+import { useData, Student } from '../contexts/DataContext';
 import { useMemo, useState, useEffect } from 'react';
 import { cn } from '../lib/utils';
 
@@ -36,7 +36,7 @@ import { cn } from '../lib/utils';
 const getMonthDay = (dob: string) => {
   let m = -1, d = -1;
   if (!dob) return { m, d };
-  
+
   if (dob.includes('/')) {
     const parts = dob.split('/');
     if (parts.length >= 2) {
@@ -60,11 +60,13 @@ const getMonthDay = (dob: string) => {
   return { m, d };
 };
 
+import { sortStudentsGlobal } from '../lib/utils';
+
 export default function Dashboard() {
   const { students, todaysLogs, totalSessions, fetchLogsByDates, announcements, admins, addAdmin, removeAdmin, settings, addAnnouncement, updateAnnouncement, deleteAnnouncement } = useData();
   const todayDateObj = new Date();
   const today = new Date(todayDateObj.getTime() - todayDateObj.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-  
+
   const [selectedDate, setSelectedDate] = useState(today);
   const [selectedGroup, setSelectedGroup] = useState('all');
   const [dashboardLogs, setDashboardLogs] = useState<any[]>([]);
@@ -109,18 +111,18 @@ export default function Dashboard() {
   const groups = useMemo(() => {
     const defaultOrder = ['Sen Non', 'Sen Hồng', 'Sen Xanh'];
     const extractedGroups = Array.from(new Set(students.map(s => s.group))).filter((g): g is string => !!g);
-    
+
     // Sort extracted groups based on defaultOrder, unknown groups come after
     extractedGroups.sort((a, b) => {
       const indexA = defaultOrder.indexOf(a);
       const indexB = defaultOrder.indexOf(b);
-      
+
       if (indexA !== -1 && indexB !== -1) return indexA - indexB; // Both in defaultOrder
       if (indexA !== -1) return -1; // a is in defaultOrder
       if (indexB !== -1) return 1; // b is in defaultOrder
       return a.localeCompare(b); // Neither in defaultOrder, sort alphabetically
     });
-    
+
     return ['all', ...extractedGroups];
   }, [students]);
 
@@ -130,7 +132,7 @@ export default function Dashboard() {
   }, [students, selectedGroup]);
 
   const selectedDateAttendance = selectedDate === today ? todaysLogs : dashboardLogs.filter(log => log.date === selectedDate);
-  
+
   const presentCount = selectedDateAttendance.filter(log => filteredStudents.some(s => s.id === log.studentId)).length;
   const totalCount = filteredStudents.length;
   const absentCount = totalCount - presentCount;
@@ -149,32 +151,32 @@ export default function Dashboard() {
   // Chuyên cần nhất
   const mostDiligentStudent = useMemo(() => {
     if (filteredStudents.length === 0) return null;
-    return filteredStudents.reduce((prev, current) => 
+    return filteredStudents.reduce((prev, current) =>
       (prev.sessions > current.sessions) ? prev : current
     );
   }, [filteredStudents]);
 
   const summaryStats = [
-    { 
-        label: 'HÔM NAY', 
-        value: `${presentRate}%`, 
-        change: `${todayChange > 0 ? '+' : ''}${todayChange}%`, 
-        trend: todayChange >= 0 ? 'up' : 'down',
-        subtext: 'So với buổi trước'
+    {
+      label: 'HÔM NAY',
+      value: `${presentRate}%`,
+      change: `${todayChange > 0 ? '+' : ''}${todayChange}%`,
+      trend: todayChange >= 0 ? 'up' : 'down',
+      subtext: 'So với buổi trước'
     },
-    { 
-        label: 'ĐÃ TỔ CHỨC', 
-        value: `${totalSessions}`, 
-        change: '', 
-        trend: 'neutral',
-        subtext: 'Tổng số buổi'
+    {
+      label: 'ĐÃ TỔ CHỨC',
+      value: `${totalSessions}`,
+      change: '',
+      trend: 'neutral',
+      subtext: 'Tổng số buổi'
     },
-    { 
-        label: 'CHUYÊN CẦN NHẤT', 
-        value: mostDiligentStudent ? (mostDiligentStudent.dh || mostDiligentStudent.name) : 'N/A', 
-        change: mostDiligentStudent ? `${mostDiligentStudent.sessions} lần` : '', 
-        trend: 'neutral',
-        subtext: 'Nhiều lượt tham gia nhất'
+    {
+      label: 'CHUYÊN CẦN NHẤT',
+      value: mostDiligentStudent ? (mostDiligentStudent.dh || mostDiligentStudent.name) : 'N/A',
+      change: mostDiligentStudent ? `${mostDiligentStudent.sessions} lần` : '',
+      trend: 'neutral',
+      subtext: 'Nhiều lượt tham gia nhất'
     }
   ];
 
@@ -228,19 +230,22 @@ export default function Dashboard() {
         return false;
       });
     }
-    
-    // Sort by month then day
-    return filtered.sort((a, b) => {
+
+    // Sort by global order first (Group -> Name), then by Month -> Day
+    // Since JS sort is stable, this ensures students with same birthday are sorted correctly
+    const preSorted = sortStudentsGlobal<Student>(filtered);
+
+    return preSorted.sort((a, b) => {
       const dateA = getMonthDay(a.dob);
       const dateB = getMonthDay(b.dob);
-      
+
       if (dateA.m !== dateB.m) return dateA.m - dateB.m;
       return dateA.d - dateB.d;
     });
   }, [students, selectedQuarter]);
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8"
@@ -252,26 +257,26 @@ export default function Dashboard() {
           <p className="text-on-surface-variant mt-1 text-sm font-medium">Cập nhật tình hình khóa tu hôm nay</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-              <div className="relative flex-1">
-                <select 
-                  value={selectedGroup}
-                  onChange={(e) => setSelectedGroup(e.target.value)}
-                  className="w-full bg-surface-container-lowest border border-outline-variant pl-4 pr-10 py-3 sm:py-2 rounded-2xl sm:rounded-full text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer appearance-none"
-                >
-                  {groups.map(g => (
-                    <option key={g} value={g}>{g === 'all' ? 'Tất cả nhóm' : g}</option>
-                  ))}
-                </select>
-                <ArrowDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-outline pointer-events-none" />
-              </div>
-              <div className="relative flex-1">
-                <input 
-                  type="date" 
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full bg-surface-container-lowest border border-outline-variant px-4 py-3 sm:py-2 rounded-2xl sm:rounded-full text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
-                />
-              </div>
+          <div className="relative flex-1">
+            <select
+              value={selectedGroup}
+              onChange={(e) => setSelectedGroup(e.target.value)}
+              className="w-full bg-surface-container-lowest border border-outline-variant pl-4 pr-10 py-3 sm:py-2 rounded-2xl sm:rounded-full text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer appearance-none"
+            >
+              {groups.map(g => (
+                <option key={g} value={g}>{g === 'all' ? 'Tất cả nhóm' : g}</option>
+              ))}
+            </select>
+            <ArrowDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-outline pointer-events-none" />
+          </div>
+          <div className="relative flex-1">
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="w-full bg-surface-container-lowest border border-outline-variant px-4 py-3 sm:py-2 rounded-2xl sm:rounded-full text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+            />
+          </div>
         </div>
       </div>
 
@@ -342,7 +347,7 @@ export default function Dashboard() {
             <h3 className="text-xl font-bold text-on-surface">Tỉ lệ chuyên cần trong tháng</h3>
             <div className="flex gap-1 bg-surface-container p-1 rounded-full text-[10px] font-bold overflow-x-auto flex-nowrap hide-scrollbar whitespace-nowrap max-w-full">
               {groups.map((tab) => (
-                <button 
+                <button
                   key={tab}
                   onClick={() => setSelectedGroup(tab)}
                   className={cn(
@@ -360,21 +365,21 @@ export default function Dashboard() {
               <BarChart data={attendanceData}>
                 <Bar dataKey="value">
                   {attendanceData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={entry.active ? '#4d6549' : '#cfeac7'} 
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.active ? '#4d6549' : '#cfeac7'}
                       radius={[4, 4, 0, 0]}
                     />
                   ))}
                 </Bar>
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
                   tick={{ fontSize: 12, fontWeight: 500, fill: '#747970' }}
                   dy={10}
                 />
-                <Tooltip 
+                <Tooltip
                   cursor={{ fill: 'transparent' }}
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
@@ -403,7 +408,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-3">
               <div className="flex gap-1 bg-surface-container p-1 rounded-full text-[10px] font-bold">
                 {[1, 2, 3, 4].map((q) => (
-                  <button 
+                  <button
                     key={q}
                     onClick={() => setSelectedQuarter(q)}
                     className={cn(
@@ -415,7 +420,7 @@ export default function Dashboard() {
                   </button>
                 ))}
               </div>
-              <button 
+              <button
                 onClick={() => setShowAllBirthdaysModal(true)}
                 className="text-sm font-bold text-primary hover:opacity-80 whitespace-nowrap"
               >
@@ -430,7 +435,7 @@ export default function Dashboard() {
               birthdays.map((p, i) => {
                 const { d, m } = getMonthDay(p.dob);
                 const isToday = d === todayDateObj.getDate() && m === (todayDateObj.getMonth() + 1);
-                
+
                 return (
                   <div key={p.id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-surface-container-low transition-colors group">
                     {p.avatar ? (
@@ -465,7 +470,7 @@ export default function Dashboard() {
           <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px] custom-scrollbar pr-2">
             {announcements.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map((n) => (
               <div key={n.id} className="flex gap-3 p-3 rounded-xl bg-surface border border-outline-variant/30 hover:border-primary/20 transition-all group">
-                <button 
+                <button
                   onClick={() => updateAnnouncement(n.id, { isCompleted: !n.isCompleted })}
                   className="mt-0.5 text-outline hover:text-primary transition-colors flex-shrink-0"
                 >
@@ -490,7 +495,7 @@ export default function Dashboard() {
                           }
                           setEditingNoteId(null);
                         } else if (e.key === 'Escape') {
-                           setEditingNoteId(null);
+                          setEditingNoteId(null);
                         }
                       }}
                       autoFocus
@@ -503,7 +508,7 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button 
+                  <button
                     onClick={() => {
                       setEditingNoteId(n.id);
                       setEditingNoteContent(n.content);
@@ -512,7 +517,7 @@ export default function Dashboard() {
                   >
                     <Edit2 size={14} />
                   </button>
-                  <button 
+                  <button
                     onClick={() => {
                       if (window.confirm('Xóa ghi chú này?')) {
                         deleteAnnouncement(n.id);
@@ -531,7 +536,7 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          
+
           <div className="mt-6 flex gap-2">
             <input
               type="text"
@@ -546,7 +551,7 @@ export default function Dashboard() {
               }}
               className="flex-1 bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-2 text-sm font-medium focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
             />
-            <button 
+            <button
               onClick={() => {
                 if (newNoteContent.trim()) {
                   addAnnouncement(newNoteContent.trim());
@@ -569,15 +574,15 @@ export default function Dashboard() {
             <h3 className="text-lg sm:text-xl font-bold text-on-surface truncate">Quản lý Huynh trưởng (Admins)</h3>
           </div>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <input 
-            type="email" 
-            placeholder="Nhập email huynh trưởng..." 
+          <input
+            type="email"
+            placeholder="Nhập email huynh trưởng..."
             className="flex-1 bg-surface-container-low border-none rounded-2xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none w-full"
             id="admin-email-input"
           />
-          <button 
+          <button
             onClick={() => {
               const input = document.getElementById('admin-email-input') as HTMLInputElement;
               if (input && input.value) {
@@ -613,7 +618,7 @@ export default function Dashboard() {
                   <h4 className="text-sm font-bold text-on-surface truncate pr-2">{admin.email}</h4>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => {
                   if (settings.requireDeleteConfirm) {
                     if (window.confirm('Bạn có chắc chắn muốn xóa quyền huynh trưởng này?')) {
@@ -636,7 +641,7 @@ export default function Dashboard() {
       {/* Modal Toàn bộ sinh nhật */}
       {showAllBirthdaysModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
@@ -647,14 +652,14 @@ export default function Dashboard() {
                 <Cake className="text-tertiary" size={24} />
                 <h2 className="text-xl font-bold text-on-surface">Toàn bộ sinh nhật khóa sinh</h2>
               </div>
-              <button 
+              <button
                 onClick={() => setShowAllBirthdaysModal(false)}
                 className="w-10 h-10 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center transition-colors"
               >
                 <X size={20} className="text-on-surface-variant" />
               </button>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3 pb-4">
               {students
                 .slice()
@@ -667,7 +672,7 @@ export default function Dashboard() {
                 .map((p) => {
                   const { d, m } = getMonthDay(p.dob);
                   const isToday = d === todayDateObj.getDate() && m === (todayDateObj.getMonth() + 1);
-                  
+
                   return (
                     <div key={p.id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-surface-container-low border border-transparent hover:border-outline-variant/30 transition-all">
                       {p.avatar ? (

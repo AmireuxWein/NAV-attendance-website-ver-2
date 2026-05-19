@@ -6,14 +6,14 @@ Dưới góc độ của một Senior Full-stack Developer và UI/UX Designer, d
 
 ## 🔥 Ưu tiên Cao (Kiến trúc, Hiệu suất & Độ ổn định)
 
-### 1. Tối ưu hóa việc tải dữ liệu (Data Fetching) và State Management
+### 1. Tối ưu hóa việc tải dữ liệu (Data Fetching) và State Management // done
 - **Vấn đề hiện tại:** Trong `DataContext.tsx`, bạn đang sử dụng `onSnapshot` để kéo **toàn bộ** collections `students` và `attendanceLogs` về lưu trong RAM (React State) ngay khi người dùng đăng nhập. 
 - **Rủi ro:** Khi số lượng khóa sinh lên tới hàng ngàn và dữ liệu điểm danh tích lũy theo năm tháng, việc này sẽ làm treo trình duyệt (Memory Leak), tăng chi phí đọc Firestore (Firestore Read Quotas) và làm ứng dụng khởi động rất chậm.
 - **Giải pháp đề xuất:** 
   - Không tải toàn bộ `attendanceLogs` lúc khởi động. Hãy truy vấn logs theo ngày/tháng khi cần thiết (ví dụ: ở trang Reports chỉ truy vấn logs trong khoảng thời gian được chọn).
   - Áp dụng Pagination (Phân trang) hoặc Infinite Scrolling cho danh sách `students` nếu dữ liệu quá lớn.
 
-### 2. Thay đổi chiến lược lưu trữ Hình ảnh (Avatars)
+### 2. Thay đổi chiến lược lưu trữ Hình ảnh (Avatars) // done
 - **Vấn đề hiện tại:** Ở `Participants.tsx`, ảnh đại diện (avatar) đang được convert sang dạng Base64 và lưu trực tiếp vào field `avatar` của document trong Firestore.
 - **Rủi ro:** Firestore giới hạn dung lượng mỗi document là 1MB. Chuỗi Base64 cực kỳ lớn sẽ nhanh chóng làm đầy document, gây quá tải bộ nhớ khi fetch dữ liệu và tốn kém chi phí lưu trữ/băng thông.
 - **Giải pháp đề xuất:** 
