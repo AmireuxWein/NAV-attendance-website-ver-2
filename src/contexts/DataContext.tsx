@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { format } from 'date-fns';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, query, getDocs, where, writeBatch, serverTimestamp, getDoc, arrayUnion, runTransaction } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -148,7 +149,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       handleFirestoreError(error, OperationType.LIST, 'students');
     });
 
-    const todayDate = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    const todayDate = format(new Date(), 'yyyy-MM-dd');
     const qTodaysLogs = query(collection(db, 'attendanceLogs'), where('date', '==', todayDate));
     const unsubLogs = onSnapshot(qTodaysLogs, (snapshot) => {
       const data: AttendanceLog[] = [];
@@ -234,9 +235,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         return { success: false, message: 'Không tìm thấy khóa sinh' };
       }
 
-      // Convert UTC to local date string reliably
-      const todayObj = new Date();
-      const todayDate = new Date(todayObj.getTime() - todayObj.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+      // Convert local date string reliably
+      const todayDate = format(new Date(), 'yyyy-MM-dd');
 
       // First check local state for speed
       const alreadyAttendedLocal = todaysLogs.some(

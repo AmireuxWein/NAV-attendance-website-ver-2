@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowDown } from 'lucide-react';
+import { format, subDays, startOfMonth, nextSunday, isSunday, isSameMonth, addWeeks, parse, isValid, getMonth, getDate } from 'date-fns';
 import { useData, Student } from '../contexts/DataContext';
 import { sortStudentsGlobal } from '../lib/utils';
 import { DEFAULT_GROUPS } from '../lib/constants';
@@ -12,32 +13,28 @@ import { TodoList } from '../features/dashboard/TodoList';
 import { AdminManager } from '../features/dashboard/AdminManager';
 import { AllBirthdaysModal } from '../features/dashboard/AllBirthdaysModal';
 
-// Helper to safely extract month and day
+// Helper to safely extract month and day using date-fns
 const getMonthDay = (dob: string) => {
-  let m = -1, d = -1;
-  if (!dob) return { m, d };
-
-  if (dob.includes('/')) {
-    const parts = dob.split('/');
-    if (parts.length >= 2) {
-      d = parseInt(parts[0], 10);
-      m = parseInt(parts[1], 10);
-    }
-  } else if (dob.includes('-')) {
-    const parts = dob.split('-');
-    if (parts.length === 3) {
-      if (parts[0].length === 4) {
-        // YYYY-MM-DD
-        m = parseInt(parts[1], 10);
-        d = parseInt(parts[2], 10);
-      } else {
-        // DD-MM-YYYY
-        d = parseInt(parts[0], 10);
-        m = parseInt(parts[1], 10);
-      }
+  if (!dob) return { m: -1, d: -1 };
+  
+  const cleanDob = dob.trim();
+  let dateObj = new Date(cleanDob);
+  
+  if (cleanDob.includes('/')) {
+    dateObj = parse(cleanDob, cleanDob.split('/').length >= 3 ? 'dd/MM/yyyy' : 'dd/MM', new Date());
+  } else if (cleanDob.includes('-')) {
+    if (cleanDob.split('-')[0].length === 4) {
+      dateObj = parse(cleanDob, 'yyyy-MM-dd', new Date());
+    } else {
+      dateObj = parse(cleanDob, 'dd-MM-yyyy', new Date());
     }
   }
-  return { m, d };
+
+  if (isValid(dateObj)) {
+    return { m: getMonth(dateObj) + 1, d: getDate(dateObj) };
+  }
+  
+  return { m: -1, d: -1 };
 };
 
 export default function Dashboard() {
@@ -57,7 +54,7 @@ export default function Dashboard() {
   } = useData();
 
   const todayDateObj = new Date();
-  const today = new Date(todayDateObj.getTime() - todayDateObj.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+  const today = format(todayDateObj, 'yyyy-MM-dd');
 
   const [selectedDate, setSelectedDate] = useState(today);
   const [selectedGroup, setSelectedGroup] = useState('all');
@@ -65,25 +62,19 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchLogs = async () => {
-      const selectedDateObj = new Date(selectedDate);
-      const year = selectedDateObj.getFullYear();
-      const month = selectedDateObj.getMonth();
-
-      let firstDay = new Date(year, month, 1);
-      let daysUntilSunday = (7 - firstDay.getDay()) % 7;
-      let firstSunday = new Date(year, month, 1 + daysUntilSunday);
+      // Safely parse selectedDate which is in yyyy-MM-dd format
+      const selectedDateObj = parse(selectedDate, 'yyyy-MM-dd', new Date());
+      
+      const firstDay = startOfMonth(selectedDateObj);
+      let currentSunday = isSunday(firstDay) ? firstDay : nextSunday(firstDay);
 
       const sundays: string[] = [];
-      let currentSunday = firstSunday;
-      while (currentSunday.getMonth() === month) {
-        const d = new Date(currentSunday.getTime() - currentSunday.getTimezoneOffset() * 60000);
-        sundays.push(d.toISOString().split('T')[0]);
-        currentSunday = new Date(currentSunday.getFullYear(), currentSunday.getMonth(), currentSunday.getDate() + 7);
+      while (isSameMonth(currentSunday, selectedDateObj)) {
+        sundays.push(format(currentSunday, 'yyyy-MM-dd'));
+        currentSunday = addWeeks(currentSunday, 1);
       }
 
-      const yesterdayDateObj = new Date(selectedDate);
-      yesterdayDateObj.setDate(yesterdayDateObj.getDate() - 1);
-      const yesterdayStr = new Date(yesterdayDateObj.getTime() - yesterdayDateObj.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+      const yesterdayStr = format(subDays(selectedDateObj, 1), 'yyyy-MM-dd');
 
       const requiredDates = Array.from(new Set([yesterdayStr, ...sundays]));
       const logs = await fetchLogsByDates(requiredDates);
@@ -92,7 +83,7 @@ export default function Dashboard() {
     fetchLogs();
   }, [selectedDate, fetchLogsByDates]);
 
-  const [selectedQuarter, setSelectedQuarter] = useState<number | 'all'>(Math.ceil((new Date().getMonth() + 1) / 3));
+  const [selectedQuarter, setSelectedQuarter] = useState<number | 'all'>(Math.ceil((getMonth(new Date()) + 1) / 3));
   const [showAllBirthdaysModal, setShowAllBirthdaysModal] = useState(false);
 
   const groups = useMemo(() => {
@@ -123,9 +114,7 @@ export default function Dashboard() {
   const absentCount = totalCount - presentCount;
   const presentRate = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
 
-  const yesterdayDateObj = new Date(selectedDate);
-  yesterdayDateObj.setDate(yesterdayDateObj.getDate() - 1);
-  const yesterdayStr = new Date(yesterdayDateObj.getTime() - yesterdayDateObj.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+  const yesterdayStr = format(subDays(parse(selectedDate, 'yyyy-MM-dd', new Date()), 1), 'yyyy-MM-dd');
   const yesterdayLogCount = dashboardLogs.filter(log => log.date === yesterdayStr && filteredStudents.some(s => s.id === log.studentId)).length;
   const yesterdayRate = totalCount > 0 ? Math.round((yesterdayLogCount / totalCount) * 100) : 0;
   const todayChange = presentRate - yesterdayRate;

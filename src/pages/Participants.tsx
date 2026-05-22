@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { motion } from 'motion/react';
+import { format } from 'date-fns';
+import toast from 'react-hot-toast';
 import { useData, Student } from '../contexts/DataContext';
 import { sortStudentsGlobal } from '../lib/utils';
 import { DEFAULT_GROUPS } from '../lib/constants';
@@ -29,8 +31,8 @@ const getCroppedImg = async (
     throw new Error('No 2d context')
   }
 
-  canvas.width = 150
-  canvas.height = 150
+  canvas.width = 100
+  canvas.height = 100
 
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -43,11 +45,11 @@ const getCroppedImg = async (
     pixelCrop.height,
     0,
     0,
-    150,
-    150
+    100,
+    100
   )
 
-  return canvas.toDataURL('image/jpeg', 0.6)
+  return canvas.toDataURL('image/webp', 0.5)
 }
 
 export default function Participants() {
@@ -128,7 +130,7 @@ export default function Participants() {
     const file = e.target.files?.[0];
     if (file && selectedStudent) {
       if (file.size > 20 * 1024 * 1024) {
-        alert("Kích thước ảnh không được vượt quá 20MB");
+        toast.error("Kích thước ảnh không được vượt quá 20MB");
         e.target.value = '';
         return;
       }
@@ -149,9 +151,10 @@ export default function Participants() {
       await updateStudent(selectedStudent.id, { avatar: croppedImageBase64 });
       setSelectedStudent({ ...selectedStudent, avatar: croppedImageBase64 });
       setImageToCrop(null);
+      toast.success('Lưu ảnh thành công!');
     } catch (e) {
       console.error(e);
-      alert('Có lỗi xảy ra khi lưu ảnh. Vui lòng thử lại.');
+      toast.error('Có lỗi xảy ra khi lưu ảnh. Vui lòng thử lại.');
     }
   };
 
@@ -165,7 +168,7 @@ export default function Participants() {
     }
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = format(new Date(), 'yyyy-MM-dd');
   const attendedIds = new Set<string>(todaysLogs.map(log => log.studentId));
 
   const filteredStudents = students.filter(s => {

@@ -3,19 +3,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
 import TopBar from './components/TopBar';
-import Dashboard from './pages/Dashboard';
-import Attendance from './pages/Attendance';
-import Participants from './pages/Participants';
-import Reports from './pages/Reports';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Attendance = lazy(() => import('./pages/Attendance'));
+const Participants = lazy(() => import('./pages/Participants'));
+const Reports = lazy(() => import('./pages/Reports'));
+
 import { DataProvider, useData } from './contexts/DataContext';
 import { signInWithGoogle } from './lib/firebase';
 import { LogIn, LogOut, ShieldAlert } from 'lucide-react';
 import { auth } from './lib/firebase';
 import { signOut } from 'firebase/auth';
+import { Toaster } from 'react-hot-toast';
 
 function AppContent() {
   const { user, isAdmin, isAuthReady } = useData();
@@ -78,12 +82,18 @@ function AppContent() {
             <TopBar />
           </div>
           <main className="flex-1 px-6 pb-6 pt-24 md:px-10 md:pb-10 md:pt-28 mb-24 md:mb-0 print:m-0 print:p-0 max-w-7xl mx-auto w-full print:max-w-none">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/attendance" element={<Attendance />} />
-              <Route path="/participants" element={<Participants />} />
-              <Route path="/reports" element={<Reports />} />
-            </Routes>
+            <Suspense fallback={
+              <div className="flex h-full min-h-[50vh] items-center justify-center">
+                <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+              </div>
+            }>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/attendance" element={<Attendance />} />
+                <Route path="/participants" element={<Participants />} />
+                <Route path="/reports" element={<Reports />} />
+              </Routes>
+            </Suspense>
           </main>
           <div className="print:hidden">
             <BottomNav />
@@ -98,6 +108,7 @@ export default function App() {
   return (
     <DataProvider>
       <AppContent />
+      <Toaster position="top-center" />
     </DataProvider>
   );
 }

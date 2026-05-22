@@ -1,5 +1,6 @@
-import { Smile, Leaf, Eye, QrCode, Edit2, Trash2, Search } from 'lucide-react';
+import { Smile, Leaf, Eye, QrCode, Edit2, Trash2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useState, useEffect } from 'react';
 import { cn } from '../../lib/utils';
 import { Student } from '../../contexts/DataContext';
 
@@ -10,12 +11,26 @@ interface ParticipantListProps {
   onDelete: (id: string) => void;
 }
 
+const ITEMS_PER_PAGE = 20;
+
 export function ParticipantList({
   studentsWithStt,
   attendedIds,
   onOpenModal,
   onDelete
 }: ParticipantListProps) {
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Khi tìm kiếm hoặc lọc làm thay đổi số lượng, đưa về trang 1
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [studentsWithStt.length]);
+
+  const totalPages = Math.ceil(studentsWithStt.length / ITEMS_PER_PAGE);
+  const safePage = Math.min(currentPage, Math.max(1, totalPages));
+  const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
+  const currentStudents = studentsWithStt.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
   return (
     <div className="flex-1 overflow-auto custom-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
       <div className="hidden sm:flex gap-4 px-8 py-4 text-[10px] font-bold tracking-widest text-outline uppercase border-b border-outline-variant">
@@ -28,7 +43,7 @@ export function ParticipantList({
       </div>
 
       <div className="space-y-3 sm:space-y-4 py-4">
-        {studentsWithStt.map((p, i) => {
+        {currentStudents.map((p, i) => {
           const isAttended = attendedIds.has(p.id);
           return (
             <motion.div
@@ -127,6 +142,47 @@ export function ParticipantList({
             </div>
             <h3 className="text-lg font-bold text-on-surface">Không tìm thấy kết quả</h3>
             <p className="text-sm text-on-surface-variant max-w-xs mx-auto mt-2 text-center">Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc để tìm thấy khóa sinh bạn cần.</p>
+          </div>
+        )}
+
+        {/* Phân trang (Pagination) */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between py-6 px-4">
+            <span className="text-sm font-medium text-outline">
+              Hiển thị <strong className="text-on-surface">{startIndex + 1}</strong> - <strong className="text-on-surface">{Math.min(startIndex + ITEMS_PER_PAGE, studentsWithStt.length)}</strong> trên tổng số <strong className="text-on-surface">{studentsWithStt.length}</strong>
+            </span>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                className="p-2 rounded-xl bg-surface-container hover:bg-surface-container-high transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={cn(
+                      "w-10 h-10 rounded-xl font-bold text-sm transition-all",
+                      safePage === page 
+                        ? "bg-primary text-white shadow-md shadow-primary/20" 
+                        : "bg-transparent text-outline hover:bg-surface-container"
+                    )}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+              <button 
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={safePage === totalPages}
+                className="p-2 rounded-xl bg-surface-container hover:bg-surface-container-high transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
           </div>
         )}
 

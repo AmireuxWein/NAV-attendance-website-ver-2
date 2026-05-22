@@ -1,12 +1,17 @@
-import { useState, useEffect, useRef } from 'react';
-import { CheckCircle, QrCode, ScanLine, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { CheckCircle, QrCode, ScanLine, AlertCircle, Camera as CameraIcon, Flashlight, SwitchCamera } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Html5Qrcode } from 'html5-qrcode';
+import toast from 'react-hot-toast';
 import { useData } from '../contexts/DataContext';
 
 export default function Attendance() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<{ success: boolean; message: string; studentName?: string; dh?: string; isDuplicate?: boolean; timestamp?: number } | null>(null);
+  
+  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+  const [isFlashOn, setIsFlashOn] = useState(false);
+  
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const { recordAttendance } = useData();
 
@@ -18,13 +23,22 @@ export default function Attendance() {
     };
   }, []);
 
-  const startScanner = async () => {
+  const startScanner = async (mode = facingMode) => {
     try {
+      if (scannerRef.current && scannerRef.current.isScanning) {
+        await scannerRef.current.stop();
+      }
+
       setIsScanning(true);
       setScanResult(null);
-      scannerRef.current = new Html5Qrcode("reader");
+      setIsFlashOn(false);
+
+      if (!scannerRef.current) {
+        scannerRef.current = new Html5Qrcode("reader");
+      }
+
       await scannerRef.current.start(
-        { facingMode: "environment" },
+        { facingMode: mode },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
           handleScan(decodedText);
@@ -40,15 +54,40 @@ export default function Attendance() {
         success: false,
         message: 'Không thể truy cập camera. Vui lòng kiểm tra quyền truy cập.'
       });
+      toast.error('Không thể truy cập camera!');
     }
   };
 
   const stopScanner = async () => {
     if (scannerRef.current && scannerRef.current.isScanning) {
       await scannerRef.current.stop();
-      scannerRef.current.clear();
+      if (scannerRef.current.clear) scannerRef.current.clear();
     }
     setIsScanning(false);
+    setIsFlashOn(false);
+  };
+
+  const toggleCamera = async () => {
+    const newMode = facingMode === "environment" ? "user" : "environment";
+    setFacingMode(newMode);
+    if (isScanning) {
+      await startScanner(newMode);
+    }
+  };
+
+  const toggleFlash = async () => {
+    if (scannerRef.current && isScanning) {
+      try {
+        const newFlashState = !isFlashOn;
+        await scannerRef.current.applyVideoConstraints({
+          advanced: [{ torch: newFlashState }]
+        } as any);
+        setIsFlashOn(newFlashState);
+      } catch (err) {
+        console.error("Flash error:", err);
+        toast.error('Camera hiện tại không hỗ trợ đèn Flash');
+      }
+    }
   };
 
   const handleScan = async (studentId: string) => {
@@ -65,11 +104,15 @@ export default function Attendance() {
       timestamp: Date.now()
     });
 
+    if (result.success && !result.isDuplicate) {
+       toast.success('Điểm danh thành công');
+    }
+
     // Reset after 3 seconds and resume scanning
     setTimeout(() => {
       setScanResult(null);
       if (!isScanning) {
-         startScanner();
+         startScanner(facingMode);
       }
     }, 3000);
   };
@@ -110,6 +153,24 @@ export default function Attendance() {
                 transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                 className="absolute left-0 w-full h-0.5 bg-primary shadow-[0_0_15px_rgba(77,101,73,0.8)]"
               />
+            </div>
+            
+            {/* Overlay Buttons for Camera controls */}
+            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4 pointer-events-auto">
+              <button 
+                onClick={toggleFlash}
+                className={`p-3 rounded-full shadow-lg transition-all ${isFlashOn ? 'bg-primary text-white' : 'bg-surface-container-lowest/80 text-on-surface backdrop-blur-md hover:bg-surface-container-lowest'}`}
+                title="Bật/Tắt Flash"
+              >
+                <Flashlight size={20} />
+              </button>
+              <button 
+                onClick={toggleCamera}
+                className="p-3 bg-surface-container-lowest/80 text-on-surface backdrop-blur-md rounded-full shadow-lg hover:bg-surface-container-lowest transition-all"
+                title="Đổi Camera"
+              >
+                <SwitchCamera size={20} />
+              </button>
             </div>
           </div>
         )}
@@ -158,8 +219,8 @@ export default function Attendance() {
 
       {!isScanning ? (
         <button 
-          onClick={startScanner}
-          className="mt-12 bg-primary text-white font-bold text-lg py-5 px-12 rounded-full shadow-xl shadow-primary/20 flex items-center gap-3 hover:scale-105 active:scale-95 transition-all"
+          onClick={() => startScanner(facingMode)}
+          className="mt-12 bg-primary text-white font-bold text-lg py-5 px-12 rounded-full shadow-xl shadow-primary/20 flex items-center gap-3 hover:scale-105 active:scale-95 transition-all outline-none"
         >
           <QrCode size={24} />
           Bật máy quét
@@ -167,7 +228,7 @@ export default function Attendance() {
       ) : (
         <button 
           onClick={stopScanner}
-          className="mt-12 bg-surface-container-high text-on-surface font-bold text-lg py-5 px-12 rounded-full shadow-xl flex items-center gap-3 hover:scale-105 active:scale-95 transition-all"
+          className="mt-12 bg-surface-container-high text-on-surface font-bold text-lg py-5 px-12 rounded-full shadow-xl flex items-center gap-3 hover:scale-105 active:scale-95 transition-all outline-none"
         >
           Dừng máy quét
         </button>
