@@ -11,8 +11,10 @@ export const getFirstName = (fullName: string) => {
   return parts[parts.length - 1].toLowerCase();
 };
 
+import { DEFAULT_GROUPS } from './constants';
+
 export const sortStudentsGlobal = <T extends { name: string; group?: string }>(students: T[]): T[] => {
-  const defaultOrder = ['Sen Non', 'Sen Hồng', 'Sen Xanh'];
+  const defaultOrder = DEFAULT_GROUPS;
 
   return [...students].sort((a, b) => {
     // 1. Sort by group
