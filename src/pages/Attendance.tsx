@@ -8,17 +8,27 @@ import { useData } from '../contexts/DataContext';
 export default function Attendance() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<{ success: boolean; message: string; studentName?: string; dh?: string; isDuplicate?: boolean; timestamp?: number } | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [isFlashOn, setIsFlashOn] = useState(false);
   
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const processingRef = useRef(false);
   const { recordAttendance } = useData();
 
   useEffect(() => {
     return () => {
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        scannerRef.current.stop().catch(console.error);
+      // Cleanup scanner on unmount
+      if (scanTimeoutRef.current) {
+        clearTimeout(scanTimeoutRef.current);
+      }
+      if (scannerRef.current) {
+        if (scannerRef.current.isScanning) {
+          scannerRef.current.stop().catch(console.error);
+        }
+        scannerRef.current.clear().catch(console.error);
       }
     };
   }, []);
@@ -68,25 +78,32 @@ export default function Attendance() {
   };
 
   const toggleCamera = async () => {
-    const newMode = facingMode === "environment" ? "user" : "environment";
-    setFacingMode(newMode);
-    if (isScanning) {
-      await startScanner(newMode);
+    if (processingRef.current) return; // Prevent during processing
+    
+    try {
+      const newMode = facingMode === "environment" ? "user" : "environment";
+      setFacingMode(newMode);
+      if (isScanning) {
+        await startScanner(newMode);
+      }
+    } catch (error) {
+      console.error("Camera toggle error:", error);
+      toast.error('Không thể đổi camera');
     }
   };
 
   const toggleFlash = async () => {
-    if (scannerRef.current && isScanning) {
-      try {
-        const newFlashState = !isFlashOn;
-        await scannerRef.current.applyVideoConstraints({
-          advanced: [{ torch: newFlashState }]
-        } as any);
-        setIsFlashOn(newFlashState);
-      } catch (err) {
-        console.error("Flash error:", err);
-        toast.error('Camera hiện tại không hỗ trợ đèn Flash');
-      }
+    if (processingRef.current || !scannerRef.current || !isScanning) return;
+    
+    try {
+      const newFlashState = !isFlashOn;
+      await scannerRef.current.applyVideoConstraints({
+        advanced: [{ torch: newFlashState }]
+      } as any);
+      setIsFlashOn(newFlashState);
+    } catch (err) {
+      console.error("Flash error:", err);
+      toast.error('Camera hiện tại không hỗ trợ đèn Flash');
     }
   };
 
@@ -102,40 +119,84 @@ export default function Attendance() {
   };
 
   const handleScan = async (qrData: string) => {
-    // Stop scanning once we get a result temporarily
-    await stopScanner();
-    
-    // Extract student ID from QR data (handles both URL and raw ID)
-    const studentId = extractStudentIdFromQR(qrData);
-    
-    const result = await recordAttendance(studentId);
-    
-    setScanResult({
-      success: result.success,
-      message: result.message,
-      studentName: result.student?.name,
-      dh: result.student?.dh,
-      isDuplicate: result.isDuplicate,
-      timestamp: Date.now()
-    });
-
-    if (result.success && !result.isDuplicate) {
-       toast.success('Điểm danh thành công');
+    // Prevent multiple simultaneous scans
+    if (processingRef.current || isProcessing) {
+      return;
     }
 
-    // Reset after 3 seconds and resume scanning
-    setTimeout(() => {
-      setScanResult(null);
-      if (!isScanning) {
-         startScanner(facingMode);
+    processingRef.current = true;
+    setIsProcessing(true);
+
+    // Clear any existing timeout
+    if (scanTimeoutRef.current) {
+      clearTimeout(scanTimeoutRef.current);
+    }
+
+    try {
+      // Stop scanning once we get a result temporarily
+      await stopScanner();
+      
+      // Extract student ID from QR data (handles both URL and raw ID)
+      const studentId = extractStudentIdFromQR(qrData);
+      
+      // Add timeout for network operation
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout')), 10000); // 10 second timeout
+      });
+      
+      const result = await Promise.race([
+        recordAttendance(studentId),
+        timeoutPromise
+      ]) as any;
+      
+      setScanResult({
+        success: result.success,
+        message: result.message,
+        studentName: result.student?.name,
+        dh: result.student?.dh,
+        isDuplicate: result.isDuplicate,
+        timestamp: Date.now()
+      });
+
+      if (result.success && !result.isDuplicate) {
+         toast.success('Điểm danh thành công');
       }
-    }, 3000);
+
+      // Reset after 3 seconds and resume scanning
+      scanTimeoutRef.current = setTimeout(() => {
+        setScanResult(null);
+        setIsProcessing(false);
+        processingRef.current = false;
+        if (!isScanning) {
+           startScanner(facingMode);
+        }
+      }, 3000);
+    } catch (error) {
+      console.error('Scan error:', error);
+      setScanResult({
+        success: false,
+        message: 'Có lỗi xảy ra khi điểm danh. Vui lòng thử lại.',
+        timestamp: Date.now()
+      });
+      toast.error('Lỗi điểm danh!');
+      
+      // Reset after 2 seconds on error
+      scanTimeoutRef.current = setTimeout(() => {
+        setScanResult(null);
+        setIsProcessing(false);
+        processingRef.current = false;
+        if (!isScanning) {
+           startScanner(facingMode);
+        }
+      }, 2000);
+    }
   };
 
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
       className="max-w-md mx-auto py-8 flex flex-col items-center h-full"
     >
       <div className="text-center mb-10">
@@ -167,6 +228,7 @@ export default function Attendance() {
                 animate={{ top: ['10%', '90%'] }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                 className="absolute left-0 w-full h-0.5 bg-primary shadow-[0_0_15px_rgba(77,101,73,0.8)]"
+                style={{ willChange: 'transform' }}
               />
             </div>
             
@@ -191,6 +253,23 @@ export default function Attendance() {
         )}
 
         <AnimatePresence>
+          {isProcessing && !scanResult && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 10 }}
+              className="absolute bottom-6 left-6 right-6 bg-surface-container-lowest/95 backdrop-blur-xl p-5 rounded-2xl shadow-xl flex items-center gap-4 border border-primary/30 z-10"
+            >
+              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-primary/10">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold tracking-[0.2em] uppercase block mb-1 text-primary">ĐANG XỬ LÝ</span>
+                <h4 className="text-sm font-bold text-on-surface leading-tight">Đang điểm danh...</h4>
+              </div>
+            </motion.div>
+          )}
+          
           {scanResult && (
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: 10 }}
