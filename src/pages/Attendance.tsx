@@ -141,7 +141,7 @@ export default function Attendance() {
       
       // Add timeout for network operation
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout')), 10000); // 10 second timeout
+        setTimeout(() => reject(new Error('Timeout')), 30000); // 30 second timeout
       });
       
       const result = await Promise.race([

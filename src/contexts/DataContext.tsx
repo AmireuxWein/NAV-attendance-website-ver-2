@@ -251,7 +251,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const logId = `${studentId}_${todayDate}`;
       const logRef = doc(db, 'attendanceLogs', logId);
       const studentRef = doc(db, 'students', studentId);
-      const statsRef = doc(db, 'stats', 'attendance');
 
       await runTransaction(db, async (transaction) => {
         // Read operations must come first
@@ -282,17 +281,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           sessions: (studentDoc.data().sessions || 0) + 1,
           updatedAt: Date.now()
         });
-
-        transaction.set(statsRef, {
-          sessionDates: arrayUnion(todayDate)
-        }, { merge: true });
       });
-
-      // Update total sessions in local state if needed
-      const newStatsSnap = await getDoc(statsRef);
-      if (newStatsSnap.exists()) {
-        setTotalSessions((newStatsSnap.data().sessionDates || []).length);
-      }
 
       return { success: true, message: 'Điểm danh thành công', student };
     } catch (error: any) {
