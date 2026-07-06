@@ -90,9 +90,24 @@ export default function Attendance() {
     }
   };
 
-  const handleScan = async (studentId: string) => {
+  const extractStudentIdFromQR = (qrData: string): string => {
+    // If QR contains URL with data parameter, extract it
+    if (qrData.includes('api.qrserver.com') && qrData.includes('data=')) {
+      const url = new URL(qrData);
+      const studentId = url.searchParams.get('data');
+      if (studentId) return studentId;
+    }
+    // Otherwise, return the raw data (for backward compatibility)
+    return qrData;
+  };
+
+  const handleScan = async (qrData: string) => {
     // Stop scanning once we get a result temporarily
     await stopScanner();
+    
+    // Extract student ID from QR data (handles both URL and raw ID)
+    const studentId = extractStudentIdFromQR(qrData);
+    
     const result = await recordAttendance(studentId);
     
     setScanResult({
