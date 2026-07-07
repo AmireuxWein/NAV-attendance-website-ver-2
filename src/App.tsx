@@ -8,6 +8,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
 import TopBar from './components/TopBar';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Attendance = lazy(() => import('./pages/Attendance'));
@@ -109,6 +110,7 @@ export default function App() {
     <DataProvider>
       <AppContent />
       <Toaster position="top-center" />
+      <PWAInstallPrompt />
     </DataProvider>
   );
 }
