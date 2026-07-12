@@ -63,6 +63,7 @@ interface DataContextType {
   updateSettings: (newSettings: Partial<Settings>) => void;
   addStudent: (student: Omit<Student, 'id' | 'sessions' | 'qr_link'>) => Promise<void>;
   recordAttendance: (studentId: string) => Promise<{ success: boolean; message: string; student?: Student; isDuplicate?: boolean }>;
+  deleteAttendance: (studentId: string, date: string) => Promise<{ success: boolean; message: string }>;
   deleteStudent: (id: string) => Promise<void>;
   updateStudent: (id: string, data: Partial<Student>) => Promise<void>;
   addAdmin: (email: string) => Promise<void>;
@@ -297,6 +298,47 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const deleteAttendance = async (studentId: string, date: string) => {
+    try {
+      const logId = `${studentId}_${date}`;
+      const logRef = doc(db, 'attendanceLogs', logId);
+      const studentRef = doc(db, 'students', studentId);
+
+      await runTransaction(db, async (transaction) => {
+        const logDoc = await transaction.get(logRef);
+        if (!logDoc.exists()) {
+          throw new Error('LOG_NOT_FOUND');
+        }
+
+        const studentDoc = await transaction.get(studentRef);
+        if (!studentDoc.exists()) {
+          throw new Error('STUDENT_NOT_FOUND');
+        }
+
+        // Delete the attendance log
+        transaction.delete(logRef);
+        
+        // Decrement session count
+        const currentSessions = studentDoc.data().sessions || 0;
+        transaction.update(studentRef, { 
+          sessions: Math.max(0, currentSessions - 1),
+          updatedAt: Date.now()
+        });
+      });
+
+      return { success: true, message: 'Đã xóa điểm danh thành công' };
+    } catch (error: any) {
+      if (error.message === 'LOG_NOT_FOUND') {
+        return { success: false, message: 'Không tìm thấy bản ghi điểm danh' };
+      }
+      if (error.message === 'STUDENT_NOT_FOUND') {
+        return { success: false, message: 'Không tìm thấy khóa sinh trong database' };
+      }
+      handleFirestoreError(error, OperationType.DELETE, 'attendanceLogs');
+      return { success: false, message: 'Có lỗi xảy ra khi xóa điểm danh' };
+    }
+  };
+
   const fetchLogsByDates = useCallback(async (dates: string[]) => {
     if (dates.length === 0) return [];
     try {
@@ -432,7 +474,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <DataContext.Provider value={{ students, todaysLogs, totalSessions, announcements, admins, user, isAdmin, isAuthReady, settings, updateSettings, addStudent, recordAttendance, deleteStudent, updateStudent, addAdmin, removeAdmin, addAnnouncement, updateAnnouncement, deleteAnnouncement, fetchLogsByDates, fetchLogsByDateRange, fetchLastLogForStudent }}>
+    <DataContext.Provider value={{ students, todaysLogs, totalSessions, announcements, admins, user, isAdmin, isAuthReady, settings, updateSettings, addStudent, recordAttendance, deleteAttendance, deleteStudent, updateStudent, addAdmin, removeAdmin, addAnnouncement, updateAnnouncement, deleteAnnouncement, fetchLogsByDates, fetchLogsByDateRange, fetchLastLogForStudent }}>
       {children}
     </DataContext.Provider>
   );

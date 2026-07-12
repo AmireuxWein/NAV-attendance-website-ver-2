@@ -6,15 +6,18 @@ import {
   FileText,
   Eye,
   Settings2,
-  Info
+  Info,
+  Trash2,
+  X
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useData } from '../contexts/DataContext';
 import { useState, useMemo, useEffect } from 'react';
 import { sortStudentsGlobal } from '../lib/utils';
+import toast from 'react-hot-toast';
 
 export default function Reports() {
-  const { students, fetchLogsByDateRange } = useData();
+  const { students, fetchLogsByDateRange, deleteAttendance } = useData();
   const today = new Date();
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
   const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -23,6 +26,8 @@ export default function Reports() {
   const [toDate, setToDate] = useState(lastDay);
   const [selectedGroup, setSelectedGroup] = useState('Tất cả các nhóm');
   const [reportLogs, setReportLogs] = useState<any[]>([]);
+  const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ studentId: string; date: string; studentName: string } | null>(null);
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -33,6 +38,22 @@ export default function Reports() {
     };
     fetchLogs();
   }, [fromDate, toDate, fetchLogsByDateRange]);
+
+  const handleDeleteAttendance = async () => {
+    if (!deleteConfirm) return;
+
+    const result = await deleteAttendance(deleteConfirm.studentId, deleteConfirm.date);
+    
+    if (result.success) {
+      toast.success('Đã xóa điểm danh thành công');
+      setDeleteConfirm(null);
+      // Refresh logs
+      const logs = await fetchLogsByDateRange(fromDate, toDate);
+      setReportLogs(logs);
+    } else {
+      toast.error(result.message);
+    }
+  };
 
   const groups = useMemo(() => {
     const defaultOrder = ['Sen Non', 'Sen Hồng', 'Sen Xanh'];
@@ -216,16 +237,82 @@ export default function Reports() {
                     <th className="py-5 px-8 min-w-[120px]">Nhóm</th>
                     <th className="py-5 px-8 text-center">Có mặt</th>
                     <th className="py-5 px-8">Thời gian điểm danh</th>
+                    <th className="py-5 px-8 w-10 print:hidden"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-primary-container/5 text-sm font-medium print:text-black print:divide-gray-300">
                   {filteredStudents.map((row, i) => (
-                    <tr key={i} className="hover:bg-surface transition-colors print:hover:bg-transparent print:break-inside-avoid">
-                      <td className="py-5 px-8 font-bold text-on-surface print:text-black">{row.name}</td>
-                      <td className="py-5 px-8 text-on-surface-variant font-medium print:text-black">{row.group}</td>
-                      <td className="py-5 px-8 text-center text-tertiary font-bold print:text-black">{row.present}</td>
-                      <td className="py-5 px-8 text-on-surface-variant print:text-black text-xs max-w-[250px] leading-relaxed">{row.timeAttended}</td>
-                    </tr>
+                    <>
+                      <tr 
+                        key={i} 
+                        className="hover:bg-surface transition-colors print:hover:bg-transparent print:break-inside-avoid cursor-pointer"
+                        onClick={() => setExpandedStudent(expandedStudent === row.name ? null : row.name)}
+                      >
+                        <td className="py-5 px-8 font-bold text-on-surface print:text-black flex items-center gap-2">
+                          {row.logs.length > 0 && (
+                            <ChevronRight 
+                              size={16} 
+                              className={`transition-transform ${expandedStudent === row.name ? 'rotate-90' : ''}`} 
+                            />
+                          )}
+                          {row.name}
+                        </td>
+                        <td className="py-5 px-8 text-on-surface-variant font-medium print:text-black">{row.group}</td>
+                        <td className="py-5 px-8 text-center text-tertiary font-bold print:text-black">{row.present}</td>
+                        <td className="py-5 px-8 text-on-surface-variant print:text-black text-xs max-w-[250px] leading-relaxed">{row.timeAttended}</td>
+                        <td className="py-5 px-8 print:hidden"></td>
+                      </tr>
+                      <AnimatePresence>
+                        {expandedStudent === row.name && row.logs.length > 0 && (
+                          <tr>
+                            <td colSpan={5} className="p-0 print:hidden">
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="bg-surface-container-low/50 overflow-hidden"
+                              >
+                                <div className="p-4 space-y-2">
+                                  <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-3">Chi tiết điểm danh</p>
+                                  {row.logs.map((log: any, logIndex: number) => (
+                                    <div 
+                                      key={logIndex}
+                                      className="flex items-center justify-between bg-surface-container-lowest rounded-lg p-3 border border-primary-container/10"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-2 h-2 bg-tertiary rounded-full"></div>
+                                        <div>
+                                          <p className="text-sm font-bold text-on-surface">
+                                            {new Date(log.timestamp).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                          </p>
+                                          <p className="text-xs text-on-surface-variant">
+                                            {new Date(log.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDeleteConfirm({
+                                            studentId: log.studentId,
+                                            date: log.date,
+                                            studentName: log.studentName
+                                          });
+                                        }}
+                                        className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors"
+                                        title="Xóa điểm danh này"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </motion.div>
+                            </td>
+                          </tr>
+                        )}
+                      </AnimatePresence>
+                    </>
                   ))}
                 </tbody>
               </table>
@@ -240,6 +327,51 @@ export default function Reports() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setDeleteConfirm(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-surface-container-lowest rounded-2xl p-6 max-w-md w-full shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-error/10 rounded-full flex items-center justify-center">
+                  <Trash2 className="text-error" size={24} />
+                </div>
+                <h3 className="text-xl font-bold text-on-surface">Xác nhận xóa điểm danh</h3>
+              </div>
+              <p className="text-on-surface-variant mb-6">
+                Bạn có chắc chắn muốn xóa điểm danh của <strong>{deleteConfirm.studentName}</strong> vào ngày <strong>{new Date(deleteConfirm.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</strong>?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 py-3 px-4 rounded-xl font-bold text-on-surface-variant bg-surface-container hover:bg-surface-container-highest transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleDeleteAttendance}
+                  className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-error hover:bg-error/90 transition-colors"
+                >
+                  Xóa
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
