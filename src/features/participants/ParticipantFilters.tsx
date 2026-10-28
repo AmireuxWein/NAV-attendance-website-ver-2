@@ -1,4 +1,4 @@
-import { Search, ArrowDown, UserPlus } from 'lucide-react';
+import { Search, ArrowDown, UserPlus, Calendar, Download } from 'lucide-react';
 
 interface ParticipantFiltersProps {
   searchTerm: string;
@@ -8,7 +8,10 @@ interface ParticipantFiltersProps {
   filterGroup: string;
   setFilterGroup: (val: string) => void;
   groups: string[];
+  birthYearFilter: string;
+  setBirthYearFilter: (val: string) => void;
   onAddClick: () => void;
+  onExportClick: () => void;
 }
 
 export function ParticipantFilters({
@@ -19,7 +22,10 @@ export function ParticipantFilters({
   filterGroup,
   setFilterGroup,
   groups,
-  onAddClick
+  birthYearFilter,
+  setBirthYearFilter,
+  onAddClick,
+  onExportClick
 }: ParticipantFiltersProps) {
   return (
     <div className="flex flex-col sm:flex-row bg-surface-container-lowest rounded-3xl p-4 sm:p-6 custom-shadow mb-8 gap-4 items-stretch sm:items-center justify-between">
@@ -60,15 +66,40 @@ export function ParticipantFilters({
             </select>
             <ArrowDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-outline pointer-events-none" />
           </div>
+          <div className="relative group shrink-0">
+            <div className="flex items-center bg-surface-container-low rounded-2xl px-4 py-3 border-none outline-none hover:bg-surface-container-high transition-colors">
+              <Calendar size={14} className="text-outline mr-2 shrink-0" />
+              <input
+                type="text"
+                placeholder="Năm sinh..."
+                className="bg-transparent border-none outline-none text-[11px] font-bold uppercase tracking-wider text-on-surface-variant w-20"
+                value={birthYearFilter}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, '');
+                  setBirthYearFilter(value);
+                }}
+                maxLength={4}
+              />
+            </div>
+          </div>
         </div>
       </div>
-      <button
-        onClick={onAddClick}
-        className="bg-primary text-on-primary px-6 sm:px-8 py-3.5 rounded-2xl sm:rounded-full text-[11px] font-bold tracking-[0.1em] uppercase flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all"
-      >
-        <UserPlus size={18} />
-        <span>THÊM KHÓA SINH</span>
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={onExportClick}
+          className="bg-surface-container-high text-on-surface px-4 sm:px-6 py-3.5 rounded-2xl sm:rounded-full text-[11px] font-bold tracking-[0.1em] uppercase flex items-center justify-center gap-2 hover:bg-surface-container-highest active:scale-95 transition-all border border-outline-variant/30"
+        >
+          <Download size={18} />
+          <span className="hidden sm:inline">XUẤT EXCEL</span>
+        </button>
+        <button
+          onClick={onAddClick}
+          className="bg-primary text-on-primary px-6 sm:px-8 py-3.5 rounded-2xl sm:rounded-full text-[11px] font-bold tracking-[0.1em] uppercase flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all"
+        >
+          <UserPlus size={18} />
+          <span>THÊM KHÓA SINH</span>
+        </button>
+      </div>
     </div>
   );
 }

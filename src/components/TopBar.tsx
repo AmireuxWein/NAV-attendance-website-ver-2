@@ -1,20 +1,25 @@
 import { Search, Bell, Settings, UserCircle, HelpCircle, LogOut, Leaf, ScrollText } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
+import { useNavigate } from 'react-router-dom';
 import HelpModal from './HelpModal';
 import SettingsModal from './SettingsModal';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function TopBar() {
-  const { user, announcements, updateAnnouncement } = useData();
+  const { user, announcements, updateAnnouncement, students } = useData();
+  const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -23,6 +28,9 @@ export default function TopBar() {
       }
       if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
+      }
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -33,23 +41,85 @@ export default function TopBar() {
 
   const pendingCount = announcements.filter(a => !a.isCompleted).length;
 
+  const searchResults = students.filter(s => {
+    const term = searchTerm.toLowerCase();
+    return s.name.toLowerCase().includes(term) ||
+           s.dh.toLowerCase().includes(term) ||
+           s.phone.includes(term) ||
+           s.id.includes(term);
+  }).slice(0, 5);
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setShowSearchResults(e.target.value.length > 0);
+  };
+
+  const handleStudentClick = (studentId: string) => {
+    navigate(`/participants`);
+    setSearchTerm('');
+    setShowSearchResults(false);
+  };
+
   return (
     <>
       <header className="fixed top-0 right-0 left-0 md:left-64 h-20 bg-surface-container-lowest/80 backdrop-blur-xl border-b border-outline-variant/10 px-6 sm:px-10 flex justify-between items-center z-40 transition-all">
-        <div className="flex items-center gap-3 md:hidden">
+        <div className="flex items-center gap-3 md:hidden cursor-pointer" onClick={() => navigate('/')}>
           <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center rotate-3">
              <Leaf className="text-primary" size={24} />
           </div>
           <h1 className="text-xl font-extrabold text-on-surface tracking-tighter">Niềm An Vui</h1>
         </div>
 
-        <div className="hidden md:flex items-center relative group max-w-xs w-full">
+        <div className="hidden md:flex items-center relative group max-w-xs w-full" ref={searchRef}>
           <Search className="absolute left-4 text-outline" size={16} />
           <input 
             type="text" 
-            placeholder="Tìm kiếm..."
+            placeholder="Tìm kiếm khóa sinh..."
             className="w-full bg-surface-container-low rounded-full pl-10 pr-4 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            value={searchTerm}
+            onChange={handleSearch}
+            onFocus={() => setShowSearchResults(searchTerm.length > 0)}
           />
+          
+          <AnimatePresence>
+            {showSearchResults && searchResults.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+                className="absolute top-full left-0 mt-2 w-full bg-surface-container-lowest rounded-2xl shadow-xl border border-outline-variant/10 overflow-hidden z-50"
+              >
+                {searchResults.map(student => (
+                  <div
+                    key={student.id}
+                    onClick={() => handleStudentClick(student.id)}
+                    className="p-3 hover:bg-surface-container-low cursor-pointer transition-colors flex items-center gap-3"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden">
+                      {student.avatar ? (
+                        <img src={student.avatar} alt={student.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-xs font-bold text-primary">{student.name.charAt(0)}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-on-surface truncate">{student.name}</p>
+                      <p className="text-xs text-outline truncate">{student.dh}</p>
+                    </div>
+                    <span className="text-xs font-bold text-primary/60">{student.group}</span>
+                  </div>
+                ))}
+                {searchResults.length === 0 && searchTerm.length > 0 && (
+                  <div className="p-4 text-center text-outline text-sm">
+                    Không tìm thấy kết quả
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="flex items-center gap-3">

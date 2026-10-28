@@ -47,9 +47,29 @@ export default function Attendance() {
         scannerRef.current = new Html5Qrcode("reader");
       }
 
+      // iOS-specific camera configuration for better focus
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      
+      const config = {
+        fps: 10,
+        qrbox: { width: 280, height: 280 }, // Slightly larger QR box for better scanning
+        aspectRatio: 1.0, // Force square aspect ratio for QR codes
+        // Improved camera constraints for iOS
+        videoConstraints: {
+          facingMode: mode,
+          width: { ideal: 1920 }, // Higher resolution for better coverage
+          height: { ideal: 1920 }, // Square resolution for full coverage
+          // Better focus mode for iOS
+          advanced: [
+            { focusMode: { ideal: "continuous" } },
+            { exposureMode: { ideal: "continuous" } }
+          ]
+        }
+      };
+
       await scannerRef.current.start(
         { facingMode: mode },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
+        config,
         (decodedText) => {
           handleScan(decodedText);
         },
@@ -207,7 +227,7 @@ export default function Attendance() {
       <div className="relative w-full aspect-square rounded-[40px] overflow-hidden shadow-2xl shadow-primary/10 border-8 border-white bg-surface-container group">
         
         {/* The scanner element */}
-        <div id="reader" className="w-full h-full object-cover"></div>
+        <div id="reader" className="w-full h-full aspect-square rounded-[32px]"></div>
 
         {!isScanning && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface-container-high/60 backdrop-blur-sm z-[5]">
@@ -218,11 +238,11 @@ export default function Attendance() {
         
         {isScanning && (
           <div className="absolute inset-0 pointer-events-none z-[5]">
-            <div className="absolute inset-10 border-2 border-white/20 rounded-3xl">
-              <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-primary rounded-tl-2xl" />
-              <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-primary rounded-tr-2xl" />
-              <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-primary rounded-bl-2xl" />
-              <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-primary rounded-br-2xl" />
+            <div className="absolute inset-6 border-2 border-white/20 rounded-2xl">
+              <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-primary rounded-tl-xl" />
+              <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-primary rounded-tr-xl" />
+              <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-primary rounded-bl-xl" />
+              <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-primary rounded-br-xl" />
               
               <motion.div 
                 animate={{ top: ['10%', '90%'] }}

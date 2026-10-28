@@ -20,7 +20,7 @@ export default function Sidebar() {
 
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-surface-container-lowest border-r border-outline-variant/30 px-4 py-8 hidden md:flex flex-col z-50">
-      <div className="flex items-center gap-3 mb-10 px-2">
+      <Link to="/" className="flex items-center gap-3 mb-10 px-2">
         <div className="w-10 h-10 rounded-xl bg-primary-container/20 flex items-center justify-center">
           <Leaf className="text-primary" size={24} />
         </div>
@@ -28,7 +28,7 @@ export default function Sidebar() {
           <h1 className="text-2xl font-black text-primary leading-none tracking-tighter">Niềm An Vui</h1>
           <p className="text-[10px] text-outline font-bold tracking-widest uppercase mt-1">Management Portal</p>
         </div>
-      </div>
+      </Link>
 
       <nav className="flex-1 space-y-1">
         {navItems.map((item) => {

@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { useData, Student } from '../contexts/DataContext';
 import { sortStudentsGlobal } from '../lib/utils';
 import { DEFAULT_GROUPS } from '../lib/constants';
+import * as XLSX from 'xlsx';
 
 import { ParticipantStats } from '../features/participants/ParticipantStats';
 import { ParticipantFilters } from '../features/participants/ParticipantFilters';
@@ -56,6 +57,7 @@ export default function Participants() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterGroup, setFilterGroup] = useState('all');
+  const [birthYearFilter, setBirthYearFilter] = useState('');
   const { students, todaysLogs, deleteStudent, addStudent, updateStudent, settings, fetchLastLogForStudent } = useData();
 
   const groups = useMemo(() => {
@@ -168,6 +170,55 @@ export default function Participants() {
     }
   };
 
+  const handleExportToExcel = () => {
+    try {
+      // Prepare data for Excel export
+      const exportData = studentsWithStt.map((student, index) => ({
+        'STT': index + 1,
+        'Họ và tên': student.name,
+        'Pháp danh': student.dh || '',
+        'Nhóm': student.group,
+        'Số điện thoại': student.phone || '',
+        'Ngày sinh': student.dob || '',
+        'Ngày tham gia': student.joinDate || '',
+        'Số buổi tham gia': student.sessions,
+        'Điểm danh hôm nay': attendedIds.has(student.id) ? 'Có' : 'Không'
+      }));
+
+      // Create worksheet
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      // Set column widths
+      const colWidths = [
+        { wch: 5 },  // STT
+        { wch: 25 }, // Họ và tên
+        { wch: 20 }, // Pháp danh
+        { wch: 15 }, // Nhóm
+        { wch: 15 }, // Số điện thoại
+        { wch: 15 }, // Ngày sinh
+        { wch: 15 }, // Ngày tham gia
+        { wch: 15 }, // Số buổi tham gia
+        { wch: 15 }  // Điểm danh hôm nay
+      ];
+      worksheet['!cols'] = colWidths;
+
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Danh sách khóa sinh');
+
+      // Generate filename with current date
+      const fileName = `Danh_sach_khoa_sinh_${format(new Date(), 'dd-MM-yyyy')}.xlsx`;
+
+      // Download file
+      XLSX.writeFile(workbook, fileName);
+
+      toast.success('Xuất file Excel thành công!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Có lỗi xảy ra khi xuất file Excel');
+    }
+  };
+
   const today = format(new Date(), 'yyyy-MM-dd');
   const attendedIds = new Set<string>(todaysLogs.map(log => log.studentId));
 
@@ -184,7 +235,30 @@ export default function Participants() {
 
     const matchesGroup = filterGroup === 'all' ? true : s.group === filterGroup;
 
-    return matchesSearch && matchesStatus && matchesGroup;
+    const matchesBirthYear = birthYearFilter === '' ? true :
+      (s.dob && (() => {
+        // Extract year from various date formats
+        let year = '';
+        
+        if (s.dob.includes('-')) {
+          // YYYY-MM-DD format
+          year = s.dob.split('-')[0];
+        } else if (s.dob.includes('/')) {
+          // DD/MM/YYYY format
+          const parts = s.dob.split('/');
+          year = parts[parts.length - 1]; // Get last part
+        } else {
+          // Try to extract 4-digit year from any format
+          const yearMatch = s.dob.match(/\d{4}/);
+          if (yearMatch) {
+            year = yearMatch[0];
+          }
+        }
+        
+        return year === birthYearFilter;
+      })());
+
+    return matchesSearch && matchesStatus && matchesGroup && matchesBirthYear;
   });
 
   const sortedStudents = useMemo(() => {
@@ -240,7 +314,10 @@ export default function Participants() {
         filterGroup={filterGroup}
         setFilterGroup={setFilterGroup}
         groups={groups}
+        birthYearFilter={birthYearFilter}
+        setBirthYearFilter={setBirthYearFilter}
         onAddClick={() => handleOpenModal('add')}
+        onExportClick={handleExportToExcel}
       />
 
       <ParticipantList

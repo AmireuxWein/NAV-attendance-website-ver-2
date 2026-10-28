@@ -75,3 +75,59 @@ html.dark {
 html.dark .glass-card {
   background: rgba(17, 20, 17, 0.8);
 }
+
+/* iOS Camera Focus Improvements */
+@supports (-webkit-touch-callout: none) {
+  /* iOS-specific styles */
+  #reader video {
+    object-fit: fill !important;
+    width: 100% !important;
+    height: 100% !important;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+  
+  #reader {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Prevent unwanted zooming on focus */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* General camera improvements */
+#reader {
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  aspect-ratio: 1 / 1 !important; /* Force square aspect ratio */
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+}
+
+#reader video,
+#reader__video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: fill !important; /* Fill the entire container */
+  aspect-ratio: 1 / 1 !important; /* Force square video */
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+}
+
+#reader__scan_region {
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Disable tap highlight */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
